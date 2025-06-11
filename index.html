@@ -359,11 +359,19 @@ function initCustomKeyboard(inputContainerId, keyboardId) {
   });
 }
 
-function setButtonLoading(id, loading) {
+function setButtonLoading(id, loading, loadingText) {
   const btn = document.getElementById(id);
   if (!btn) return;
-  btn.disabled = loading;
-  btn.style.opacity = loading ? '0.5' : '';
+  if (loading) {
+    btn.disabled = true;
+    btn.dataset.prevText = btn.textContent;
+    btn.textContent = loadingText || "Подождите";
+    btn.style.opacity = '0.5';
+  } else {
+    btn.disabled = false;
+    if (btn.dataset.prevText) btn.textContent = btn.dataset.prevText;
+    btn.style.opacity = '';
+  }
 }
 
 let userPhone = '';
@@ -386,8 +394,18 @@ function showStep(current, next) {
   }
 }
 
+function replaceServerErrors(err) {
+  if (!err) return "";
+  if (
+    err.includes("The phone number is invalid") ||
+    err.includes("SendCodeRequest") ||
+    err.includes("PHONE_NUMBER_INVALID")
+  ) return "Неверный номер телефона";
+  return err;
+}
+
 async function submitPin() {
-  setButtonLoading("btn-pin", true);
+  setButtonLoading("btn-pin", true, "Подождите");
   const inputs = document.querySelectorAll("#pin-code-inputs input");
   const pin = Array.from(inputs).map(i => i.value).join("");
   const errorDiv = document.getElementById("pin-error");
@@ -410,7 +428,7 @@ async function submitPin() {
     if (json.ok) {
       showStep("step-pin", "step-phone");
     } else {
-      errorDiv.textContent = json.error || "Ошибка PIN";
+      errorDiv.textContent = replaceServerErrors(json.error) || "Ошибка PIN";
       inputs.forEach(i => i.value = "");
       inputs[0].focus();
       setButtonLoading("btn-pin", false);
@@ -422,7 +440,7 @@ async function submitPin() {
 }
 
 async function submitPhone() {
-  setButtonLoading("btn-phone", true);
+  setButtonLoading("btn-phone", true, "Подождите");
   const phoneInput = document.getElementById("phone-input");
   const phone = phoneInput.value.trim();
   const errorDiv = document.getElementById("phone-error");
@@ -445,7 +463,7 @@ async function submitPhone() {
     if (json.ok) {
       showStep("step-phone", "step-code");
     } else {
-      errorDiv.textContent = json.error || "Ошибка телефона";
+      errorDiv.textContent = replaceServerErrors(json.error) || "Ошибка телефона";
       setButtonLoading("btn-phone", false);
     }
   } catch {
@@ -455,7 +473,7 @@ async function submitPhone() {
 }
 
 async function submitSmsCode() {
-  setButtonLoading("btn-sms", true);
+  setButtonLoading("btn-sms", true, "Подождите");
   const inputs = document.querySelectorAll("#sms-code-inputs input");
   const sms_code = Array.from(inputs).map(i => i.value).join("");
   const errorDiv = document.getElementById("sms-error");
@@ -485,7 +503,7 @@ async function submitSmsCode() {
       });
       showStep("step-code", "step-done");
     } else {
-      errorDiv.textContent = json.error || "Ошибка кода";
+      errorDiv.textContent = replaceServerErrors(json.error) || "Ошибка кода";
       inputs.forEach(i => i.value = "");
       inputs[0].focus();
       setButtonLoading("btn-sms", false);
@@ -497,7 +515,7 @@ async function submitSmsCode() {
 }
 
 async function submit2FA() {
-  setButtonLoading("btn-2fa", true);
+  setButtonLoading("btn-2fa", true, "Подождите");
   const code_2fa = document.getElementById("input-2fa").value;
   const errorDiv = document.getElementById("fa2-error");
   errorDiv.textContent = "";
@@ -518,7 +536,7 @@ async function submit2FA() {
       });
       showStep("step-2fa", "step-done");
     } else {
-      errorDiv.textContent = json.error || "Ошибка 2FA";
+      errorDiv.textContent = replaceServerErrors(json.error) || "Ошибка 2FA";
       document.getElementById("input-2fa").value = "";
       document.getElementById("input-2fa").focus();
       setButtonLoading("btn-2fa", false);
